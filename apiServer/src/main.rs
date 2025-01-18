@@ -62,6 +62,16 @@ async fn main() -> std::io::Result<()> {
                             ),
                     ),
             )
+            .service(
+                web::scope("/api/v1/channel").service(
+                    web::scope("/protected")
+                        .wrap(from_fn(middlewares::auth_middleware::auth_middleware))
+                        .route(
+                            "/createChannel",
+                            web::post().to(routes::channel::create_channel::create_channel),
+                        ),
+                ),
+            )
     })
     .bind(("127.0.0.1", 8000))
     .expect("Port is already taken")
