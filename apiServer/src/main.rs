@@ -69,6 +69,11 @@ async fn main() -> std::io::Result<()> {
                         .route(
                             "/createChannel",
                             web::post().to(routes::channel::create_channel::create_channel),
+                        )
+                        .route(
+                            "/addMember",
+                            web::post()
+                                .to(routes::channel::add_user_to_channel::add_user_to_channel),
                         ),
                 ),
             )

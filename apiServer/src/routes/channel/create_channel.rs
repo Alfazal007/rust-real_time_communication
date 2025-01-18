@@ -65,11 +65,13 @@ pub async fn create_channel(
 
     let mut transaction = transaction_res.unwrap();
 
-    let create_channel_result =
-        sqlx::query_as::<_, ChannelDB>("INSERT INTO channel (name) VALUES ($1) returning *")
-            .bind(channel_name)
-            .fetch_optional(transaction.as_mut())
-            .await;
+    let create_channel_result = sqlx::query_as::<_, ChannelDB>(
+        "INSERT INTO channel (name, admin_id) VALUES ($1, $2) returning *",
+    )
+    .bind(channel_name)
+    .bind(user_data.user_id)
+    .fetch_optional(transaction.as_mut())
+    .await;
 
     if create_channel_result.is_err() || create_channel_result.as_ref().unwrap().is_none() {
         let rollback_res = transaction.rollback().await;

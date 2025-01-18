@@ -4,4 +4,5 @@ use sqlx::prelude::FromRow;
 pub struct ChannelDB {
     pub id: i32,
     pub name: String,
+    pub admin_id: i32,
 }
