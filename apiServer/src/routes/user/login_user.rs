@@ -2,6 +2,7 @@ use actix_web::{
     cookie::{Cookie, SameSite},
     web, HttpResponse, Responder,
 };
+use redis::Commands;
 use validator::Validate;
 
 use crate::{validators::create_user_type::User, AppState};
@@ -81,6 +82,17 @@ pub async fn login_user(
         return HttpResponse::BadRequest().json(crate::responses::general_error::GeneralError {
             message: "Issue generating access token".to_string(),
         });
+    }
+
+    let redis_connection_result = app_state.redis_pool.get();
+
+    if redis_connection_result.is_ok() {
+        let key = format!("auth:{}", user_data.id);
+        let expiry_in_seconds = 86400; // 24 hours expiry
+        let _: () = redis_connection_result
+            .unwrap()
+            .set_ex(key, access_token.as_ref().unwrap(), expiry_in_seconds)
+            .unwrap();
     }
 
     let cookie = Cookie::build("accessToken", access_token.as_ref().unwrap())

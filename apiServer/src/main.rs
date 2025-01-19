@@ -3,7 +3,8 @@ use actix_web::{
     web, App, HttpServer,
 };
 use log::info;
-use sqlx::{postgres::PgPoolOptions, Pool, Postgres};
+use redis::Client;
+use sqlx::{postgres::PgPoolOptions, Postgres};
 use std::env;
 
 pub mod dbcalls;
@@ -15,8 +16,9 @@ pub mod tokens;
 pub mod validators;
 
 pub struct AppState {
-    pub database: Pool<Postgres>,
+    pub database: sqlx::Pool<Postgres>,
     pub access_token_secret: String,
+    pub redis_pool: r2d2::Pool<Client>,
 }
 
 #[actix_web::main]
@@ -27,6 +29,14 @@ async fn main() -> std::io::Result<()> {
     let database_url = env::var("DATABASE_URL").expect("Issue finding the database url");
     let access_token_secret =
         env::var("ACCESS_TOKEN_SECRET").expect("Issue finding the access token secret");
+
+    let redis_client =
+        redis::Client::open("redis://127.0.0.1/").expect("Issue creating redis client");
+
+    let redis_pool = r2d2::Pool::builder()
+        .max_size(5)
+        .build(redis_client)
+        .expect("Issue establishing the redis connection pool");
 
     let pool = PgPoolOptions::new()
         .max_connections(5)
@@ -42,6 +52,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(AppState {
                 database: pool.clone(),
                 access_token_secret: access_token_secret.clone(),
+                redis_pool: redis_pool.clone(),
             }))
             .service(
                 web::scope("/api/v1/user")
