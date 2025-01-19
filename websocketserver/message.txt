@@ -1,0 +1,11 @@
+{
+  "type": "JoinMessage",
+  "data": {
+    "token": "some",
+    "user_id": 1
+  }
+}
+
+{
+  "type": "LeaveMessage"
+}
