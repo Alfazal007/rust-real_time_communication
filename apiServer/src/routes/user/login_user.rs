@@ -95,15 +95,25 @@ pub async fn login_user(
             .unwrap();
     }
 
-    let cookie = Cookie::build("accessToken", access_token.as_ref().unwrap())
+    let cookie1 = Cookie::build("accessToken", access_token.as_ref().unwrap())
         .path("/")
         .secure(true)
         .http_only(true)
         .same_site(SameSite::None)
         .finish();
 
-    HttpResponse::Ok().cookie(cookie).json(LoginResponse {
-        access_token: access_token.unwrap(),
-        user_id: user_data.id,
-    })
+    let cookie2 = Cookie::build("userId", format!("{}", user_data.id))
+        .path("/")
+        .secure(true)
+        .http_only(true)
+        .same_site(SameSite::None)
+        .finish();
+
+    HttpResponse::Ok()
+        .cookie(cookie1)
+        .cookie(cookie2)
+        .json(LoginResponse {
+            access_token: access_token.unwrap(),
+            user_id: user_data.id,
+        })
 }

@@ -5,6 +5,7 @@ use actix_web::{
     web::Data,
     Error, HttpMessage, HttpResponse,
 };
+use redis::Commands;
 use serde::Serialize;
 
 use crate::{responses::general_error::GeneralError, AppState};
@@ -25,6 +26,12 @@ pub async fn auth_middleware(
         });
         return Ok(req.into_response(error_response.map_into_boxed_body()));
     }
+    if req.cookie("userId").is_none() {
+        let error_response = HttpResponse::Unauthorized().json(GeneralError {
+            message: "Unauthorized: Missing userId cookie".to_string(),
+        });
+        return Ok(req.into_response(error_response.map_into_boxed_body()));
+    }
 
     let state = match req.app_data::<Data<AppState>>() {
         Some(data) => data,
@@ -37,6 +44,7 @@ pub async fn auth_middleware(
     };
 
     let token = req.cookie("accessToken").unwrap().value().to_string();
+    let user_id = req.cookie("userId").unwrap().value().to_string();
     let token_eval_result =
         crate::tokens::validate_token::validate_token(&token, &state.access_token_secret);
 
@@ -48,6 +56,31 @@ pub async fn auth_middleware(
     }
 
     let claims = token_eval_result.unwrap();
+    let redis_connection_result = state.redis_pool.get();
+
+    // use redis to authenticate
+    if redis_connection_result.is_ok() {
+        let key = format!("auth:{}", user_id);
+        let token_redis_result: Result<String, _> = redis_connection_result.unwrap().get(key);
+        if let Ok(token_redis) = token_redis_result {
+            if token_redis == token {
+                req.extensions_mut().insert(UserData {
+                    user_id: claims.user_id,
+                    username: claims.username,
+                });
+                println!("Early return");
+                return next.call(req).await;
+            } else {
+                let error_response = HttpResponse::Unauthorized().json(GeneralError {
+                    message: "Token did not match, login again".to_string(),
+                });
+                return Ok(req.into_response(error_response.map_into_boxed_body()));
+            }
+        }
+    }
+
+    println!("late return");
+    // redis is not connected so use this alternate way
     let user_exists = crate::dbcalls::check_user_exists::check_user_exists(
         claims.user_id,
         &claims.username,
