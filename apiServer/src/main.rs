@@ -95,6 +95,10 @@ async fn main() -> std::io::Result<()> {
                 "/websocket/isValidUser",
                 web::post().to(routes::user::current_user_for_socket::current_user_for_socket),
             )
+            .route(
+                "/websocket/channels",
+                web::post().to(routes::channel::get_user_channels::current_user_for_socket),
+            )
     })
     .bind(("127.0.0.1", 8000))
     .expect("Port is already taken")
