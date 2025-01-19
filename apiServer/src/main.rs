@@ -19,6 +19,7 @@ pub struct AppState {
     pub database: sqlx::Pool<Postgres>,
     pub access_token_secret: String,
     pub redis_pool: r2d2::Pool<Client>,
+    pub api_secret: String,
 }
 
 #[actix_web::main]
@@ -27,6 +28,7 @@ async fn main() -> std::io::Result<()> {
     env_logger::Builder::new().parse_filters("info").init();
 
     let database_url = env::var("DATABASE_URL").expect("Issue finding the database url");
+    let api_secret = env::var("API_SECRET").expect("Issue finding the api secret");
     let access_token_secret =
         env::var("ACCESS_TOKEN_SECRET").expect("Issue finding the access token secret");
 
@@ -53,6 +55,7 @@ async fn main() -> std::io::Result<()> {
                 database: pool.clone(),
                 access_token_secret: access_token_secret.clone(),
                 redis_pool: redis_pool.clone(),
+                api_secret: api_secret.clone(),
             }))
             .service(
                 web::scope("/api/v1/user")
@@ -87,6 +90,10 @@ async fn main() -> std::io::Result<()> {
                                 .to(routes::channel::add_user_to_channel::add_user_to_channel),
                         ),
                 ),
+            )
+            .route(
+                "/websocket/isValidUser",
+                web::post().to(routes::user::current_user_for_socket::current_user_for_socket),
             )
     })
     .bind(("127.0.0.1", 8000))

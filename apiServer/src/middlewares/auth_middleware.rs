@@ -68,7 +68,6 @@ pub async fn auth_middleware(
                     user_id: claims.user_id,
                     username: claims.username,
                 });
-                println!("Early return");
                 return next.call(req).await;
             } else {
                 let error_response = HttpResponse::Unauthorized().json(GeneralError {
@@ -79,7 +78,6 @@ pub async fn auth_middleware(
         }
     }
 
-    println!("late return");
     // redis is not connected so use this alternate way
     let user_exists = crate::dbcalls::check_user_exists::check_user_exists(
         claims.user_id,
