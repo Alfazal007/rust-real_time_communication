@@ -3,9 +3,12 @@ use std::{
     sync::Arc,
 };
 
-use axum::extract::ws::{Message, WebSocket};
+use axum::extract::ws::{Message, Utf8Bytes, WebSocket};
+use futures_util::sink::SinkExt;
 use futures_util::stream::SplitSink;
 use tokio::sync::RwLock;
+
+use super::{subscribe_connection, unsubscribe_connection::unsubscribe_from_redis};
 
 #[derive(Debug)]
 pub struct Connection {
@@ -57,12 +60,11 @@ impl ChannelManager {
         if !self.user_connected(user_id).await {
             let mut locked_channels = self.channels.write().await;
             let user_id = UserId(user_id);
-            for channel_id in channel_ids {
+            for channel_id in channel_ids.iter() {
                 locked_channels
-                    .entry(channel_id)
+                    .entry(*channel_id)
                     .or_insert_with(HashSet::new)
                     .insert(user_id.clone());
-                // TODO:: subscribe to the channel id in pub sub
             }
             let mut connections = self.connections.write().await;
             connections.insert(
@@ -71,15 +73,15 @@ impl ChannelManager {
                     sender: websocket_sender,
                 },
             );
+            subscribe_connection::subscribe_to_redis(channel_ids).await;
         }
         self.print_room().await;
     }
 }
 
 impl ChannelManager {
-    pub async fn remove_user(&self, connection: Arc<RwLock<SplitSink<WebSocket, Message>>>) {
+    pub async fn remove_user(&self, connection: &Arc<RwLock<SplitSink<WebSocket, Message>>>) {
         let user_id_to_be_removed = {
-            let connection_sender = connection.read().await;
             let user_id_connections = self.connections.read().await;
             user_id_connections
                 .iter()
@@ -104,8 +106,8 @@ impl ChannelManager {
             }
             for channel in channels_to_remove.iter() {
                 channels_user_id.remove(channel);
-                //TODO:: unsubscribe from redis pub sub
             }
+            unsubscribe_from_redis(channels_to_remove).await;
         }
         self.print_room().await;
     }
@@ -113,11 +115,33 @@ impl ChannelManager {
 
 impl ChannelManager {
     pub async fn print_room(&self) {
-        let locked_channels = self.channels.write().await;
-        println!("Channels");
-        println!("{:?}", locked_channels);
-        let connections = self.connections.read().await;
-        println!("Connections");
-        println!("{:?}", connections);
+        {
+            let locked_channels = self.channels.write().await;
+            println!("Channels");
+            println!("{:?}", locked_channels);
+            let connections = self.connections.read().await;
+            println!("Connections");
+            println!("{:?}", connections);
+        }
+    }
+}
+
+impl ChannelManager {
+    pub async fn send_message(&self, channel_id: i32, message: String) {
+        let channel_user_ids = self.channels.read().await;
+        let connections = self.connections.write().await;
+        let users = channel_user_ids.get(&channel_id);
+        if users.is_some() {
+            for user_to_send_message_to in users.unwrap().iter() {
+                let connection = connections.get(user_to_send_message_to).unwrap();
+                let sender = &connection.sender;
+                sender
+                    .write()
+                    .await
+                    .send(axum::extract::ws::Message::Text(Utf8Bytes::from(&message)))
+                    .await
+                    .unwrap();
+            }
+        }
     }
 }

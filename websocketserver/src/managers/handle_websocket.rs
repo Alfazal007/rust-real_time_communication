@@ -27,7 +27,7 @@ pub async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
 							}) => {
 								let is_valid_user = validate_user(token, user_id, &state.api_secret).await;
 								if !is_valid_user {
-								if let Err(e) = sender.write().await
+								if let Err(_e) = sender.write().await
 									.send(
 										axum::extract::ws::Message::Close(None)).await{};
 								break;
@@ -37,7 +37,7 @@ pub async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
 								state.channel_user_map.add_user(user_id, channels.unwrap(), sender.clone()).await;
 							},
 							crate::managers::message_type_check::IncomingMessageFromUser::LeaveMessage => {
-								state.channel_user_map.remove_user(sender.clone()).await;
+								state.channel_user_map.remove_user(&sender).await;
 								let _ = sender.write().await.flush().await;
 								drop(sender);
 								break;
@@ -60,7 +60,7 @@ pub async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
             }
 
             axum::extract::ws::Message::Close(_) => {
-                state.channel_user_map.remove_user(sender.clone()).await;
+                state.channel_user_map.remove_user(&sender).await;
                 let _ = sender.write().await.flush().await;
                 drop(sender);
                 break;
