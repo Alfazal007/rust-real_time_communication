@@ -29,21 +29,14 @@ pub async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
 								if !is_valid_user {
 								if let Err(e) = sender.write().await
 									.send(
-										axum::extract::ws::Message::Close(None)).await {
-											eprintln!("Error sending close acknowledgement: {:?}", e);
-										}
+										axum::extract::ws::Message::Close(None)).await{};
 								break;
 								}
 
 								let channels = get_channels(user_id, &state.api_secret).await;
-								if channels.is_some() {
-									let list_channels = channels.as_ref().unwrap();
-									println!("There are some channels {:?}", list_channels);
-								}
 								state.channel_user_map.add_user(user_id, channels.unwrap(), sender.clone()).await;
 							},
 							crate::managers::message_type_check::IncomingMessageFromUser::LeaveMessage => {
-								println!("Closed message sent");
 								state.channel_user_map.remove_user(sender.clone()).await;
 								let _ = sender.write().await.flush().await;
 								drop(sender);
