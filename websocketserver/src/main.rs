@@ -1,20 +1,13 @@
-use axum::extract::ws::WebSocket;
 use axum::extract::State;
 use axum::routing::get;
 use axum::{extract::WebSocketUpgrade, response::IntoResponse, Router};
-use std::collections::HashSet;
+use managers::datatypes::ChannelManager;
 use std::env;
 use std::sync::Arc;
-use tokio::sync::Mutex;
-
-pub struct ChannelToUserMap {
-    pub channel_id: i32,
-    pub connections: HashSet<WebSocket>,
-}
 
 pub struct AppState {
     pub api_secret: String,
-    pub channel_user_map: Arc<Mutex<HashSet<ChannelToUserMap>>>,
+    pub channel_user_map: ChannelManager,
 }
 
 pub mod managers;
@@ -32,7 +25,7 @@ async fn main() {
     let api_secret = env::var("API_SECRET").expect("Issue finding the api secret url");
     let app_state = Arc::new(AppState {
         api_secret,
-        channel_user_map: Arc::new(Mutex::new(HashSet::new())),
+        channel_user_map: ChannelManager::new(),
     });
 
     let app = Router::new()

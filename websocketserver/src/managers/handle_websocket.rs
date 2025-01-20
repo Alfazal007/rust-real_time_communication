@@ -1,13 +1,18 @@
 use std::sync::Arc;
 
 use axum::extract::ws::{Utf8Bytes, WebSocket};
+use tokio::sync::Mutex;
 
 use crate::{managers::message_type_check::JoinMessage, AppState};
 
 use super::{get_channels::get_channels, validate_user::validate_user};
 
-pub async fn handle_socket(mut socket: WebSocket, state: Arc<AppState>) {
-    while let Some(Ok(msg)) = socket.recv().await {
+use futures_util::{stream::StreamExt, sink::SinkExt};
+
+pub async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
+    let (sender, mut receiver) = socket.split();
+    let sender = Arc::new(Mutex::new(sender));
+    while let Some(Ok(msg)) = receiver.next().await {
         match msg {
             axum::extract::ws::Message::Text(text_message) => {
                 match serde_json::from_str::<
@@ -22,7 +27,7 @@ pub async fn handle_socket(mut socket: WebSocket, state: Arc<AppState>) {
 							}) => {
 								let is_valid_user = validate_user(token, user_id, &state.api_secret).await;
 								if !is_valid_user {
-								if let Err(e) = socket
+								if let Err(e) = sender.lock().await
 									.send(
 										axum::extract::ws::Message::Close(None)).await {
 											eprintln!("Error sending close acknowledgement: {:?}", e);
@@ -32,15 +37,15 @@ pub async fn handle_socket(mut socket: WebSocket, state: Arc<AppState>) {
 
 								let channels = get_channels(user_id, &state.api_secret).await;
 								if channels.is_some() {
-									let list_channels = channels.unwrap();
+									let list_channels = channels.as_ref().unwrap();
 									println!("There are some channels {:?}", list_channels);
 								}
-								// TODO:: subscribe to the channels
+								state.channel_user_map.add_user(user_id, channels.unwrap(), sender.clone()).await;
 							},
 							crate::managers::message_type_check::IncomingMessageFromUser::LeaveMessage => {
 								println!("Closed message sent");
 								// TODO:: remove channel data
-								if let Err(e) = socket
+								if let Err(e) = sender.lock().await 
 									.send(
 										axum::extract::ws::Message::Close(None)).await {
 											eprintln!("Error sending close acknowledgement: {:?}", e);
@@ -52,7 +57,7 @@ pub async fn handle_socket(mut socket: WebSocket, state: Arc<AppState>) {
 
                     Err(_) => {
                         let error_response = "Invalid message format".to_string();
-                        socket
+                       sender.lock().await
                             .send(axum::extract::ws::Message::Text(Utf8Bytes::from(
                                 error_response,
                             )))
