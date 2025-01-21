@@ -13,5 +13,6 @@ log = "0.4.25"
 r2d2 = "0.8.10"
 redis = { version = "0.28.1", features = ["r2d2"] }
 serde = { version = "1.0.217", features = ["derive"] }
+serde_json = "1.0.137"
 sqlx = { version = "0.8.3", features = ["postgres", "runtime-async-std-native-tls"] }
 validator = { version = "0.19.0", features = ["derive"] }

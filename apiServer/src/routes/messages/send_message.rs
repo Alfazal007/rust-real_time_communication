@@ -9,6 +9,12 @@ use crate::{
     AppState,
 };
 
+#[derive(serde::Serialize)]
+struct PublishedMessage {
+    message: String,
+    sender: i32,
+}
+
 pub async fn send_message(
     req: HttpRequest,
     app_state: web::Data<AppState>,
@@ -110,10 +116,14 @@ pub async fn send_message(
     }
 
     let redis_connection_result = app_state.redis_pool.get();
+    let published_message = PublishedMessage {
+        message: message_data.0.message,
+        sender: user_data.user_id,
+    };
 
     if let Ok(mut redis_conn_mut) = redis_connection_result {
-        let _ = redis_conn_mut
-            .publish::<i32, String, ()>(message_data.0.channel_id, message_data.0.message);
+        let json_message = serde_json::to_string(&published_message).unwrap();
+        let _ = redis_conn_mut.publish::<i32, String, ()>(message_data.0.channel_id, json_message);
     }
     HttpResponse::Ok().json("message sent")
 }
