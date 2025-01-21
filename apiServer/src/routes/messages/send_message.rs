@@ -1,4 +1,5 @@
 use actix_web::{web, HttpMessage, HttpRequest, HttpResponse, Responder};
+use redis::Commands;
 use validator::Validate;
 
 use crate::{
@@ -77,7 +78,7 @@ pub async fn send_message(
     )
     .bind(user_data.user_id)
     .bind(message_data.0.channel_id)
-    .bind(message_data.0.message)
+    .bind(&message_data.0.message)
     .fetch_optional(transaction.as_mut())
     .await;
 
@@ -108,6 +109,11 @@ pub async fn send_message(
         );
     }
 
-    // TODO:: send message to the publisher
-    HttpResponse::Ok().json(())
+    let redis_connection_result = app_state.redis_pool.get();
+
+    if let Ok(mut redis_conn_mut) = redis_connection_result {
+        let _ = redis_conn_mut
+            .publish::<i32, String, ()>(message_data.0.channel_id, message_data.0.message);
+    }
+    HttpResponse::Ok().json("message sent")
 }
