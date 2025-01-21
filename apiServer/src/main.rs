@@ -91,6 +91,16 @@ async fn main() -> std::io::Result<()> {
                         ),
                 ),
             )
+            .service(
+                web::scope("/api/v1/message").service(
+                    web::scope("/protected")
+                        .wrap(from_fn(middlewares::auth_middleware::auth_middleware))
+                        .route(
+                            "/send",
+                            web::post().to(routes::messages::send_message::send_message),
+                        ),
+                ),
+            )
             .route(
                 "/websocket/isValidUser",
                 web::post().to(routes::user::current_user_for_socket::current_user_for_socket),
