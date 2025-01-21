@@ -56,6 +56,7 @@ impl ChannelManager {
         user_id: i32,
         channel_ids: Vec<i32>,
         websocket_sender: Arc<RwLock<SplitSink<WebSocket, Message>>>,
+        //        redis_pool: &Pool<Client>,
     ) {
         if !self.user_connected(user_id).await {
             let mut locked_channels = self.channels.write().await;
@@ -73,7 +74,8 @@ impl ChannelManager {
                     sender: websocket_sender,
                 },
             );
-            subscribe_connection::subscribe_to_redis(channel_ids).await;
+
+            //             subscribe_connection::subscribe(channel_ids).await;
         }
         self.print_room().await;
     }
