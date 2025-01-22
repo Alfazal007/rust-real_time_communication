@@ -5,8 +5,8 @@ use futures_util::StreamExt;
 use managers::datatypes::ChannelManager;
 use managers::subscribe_connection::RedisPubSub;
 use std::collections::HashSet;
+use std::env;
 use std::sync::Arc;
-use std::{env, string};
 use tokio::sync::Mutex;
 
 pub struct AppState {
