@@ -8,6 +8,12 @@ use futures_util::sink::SinkExt;
 use futures_util::stream::SplitSink;
 use tokio::sync::{Mutex, RwLock};
 
+#[derive(serde::Deserialize)]
+struct MessageToBeBroadcasted {
+    message: String,
+    sender: i32,
+}
+
 use super::{subscribe_connection::RedisPubSub, unsubscribe_connection::unsubscribe_from_redis};
 
 #[derive(Debug)]
@@ -18,7 +24,6 @@ pub struct Connection {
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
 pub struct UserId(i32);
 
-#[derive(Debug)]
 pub struct ChannelManager {
     pub channels: HashMap<i32, HashSet<UserId>>,
     pub connections: HashMap<UserId, Connection>,
@@ -26,15 +31,6 @@ pub struct ChannelManager {
 
 impl ChannelManager {
     pub fn new() -> Self {
-        Self {
-            channels: HashMap::new(),
-            connections: HashMap::new(),
-        }
-    }
-}
-
-impl Default for ChannelManager {
-    fn default() -> Self {
         Self {
             channels: HashMap::new(),
             connections: HashMap::new(),
@@ -79,7 +75,6 @@ impl ChannelManager {
                     .await;
             }
         }
-        self.print_room().await;
     }
 }
 
@@ -108,34 +103,28 @@ impl ChannelManager {
             }
             unsubscribe_from_redis(channels_to_remove).await;
         }
-        self.print_room().await;
     }
 }
 
 impl ChannelManager {
-    pub async fn print_room(&self) {
-        {
-            println!("Channels");
-            println!("{:?}", self.channels);
-            println!("Connections");
-            println!("{:?}", self.connections);
-        }
-    }
-}
-
-impl ChannelManager {
-    pub async fn send_message(&self, channel_id: i32, message: String) {
+    pub async fn send_message(&self, channel_id: i32, message: &str) {
+        let parsed_message: MessageToBeBroadcasted =
+            serde_json::from_str(message).expect("Failed to parse JSON");
         let users = self.channels.get(&channel_id);
         if users.is_some() {
             for user_to_send_message_to in users.unwrap().iter() {
-                let connection = self.connections.get(user_to_send_message_to).unwrap();
-                let sender = &connection.sender;
-                sender
-                    .write()
-                    .await
-                    .send(axum::extract::ws::Message::Text(Utf8Bytes::from(&message)))
-                    .await
-                    .unwrap();
+                if user_to_send_message_to.0 != parsed_message.sender {
+                    let connection = self.connections.get(user_to_send_message_to).unwrap();
+                    let sender = &connection.sender;
+                    sender
+                        .write()
+                        .await
+                        .send(axum::extract::ws::Message::Text(Utf8Bytes::from(
+                            &parsed_message.message,
+                        )))
+                        .await
+                        .unwrap();
+                }
             }
         }
     }

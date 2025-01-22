@@ -5,8 +5,8 @@ use futures_util::StreamExt;
 use managers::datatypes::ChannelManager;
 use managers::subscribe_connection::RedisPubSub;
 use std::collections::HashSet;
-use std::env;
 use std::sync::Arc;
+use std::{env, string};
 use tokio::sync::Mutex;
 
 pub struct AppState {
@@ -53,13 +53,16 @@ async fn main() {
     tokio::spawn(async move {
         loop {
             let message = pubsub_stream.next().await.expect("Invalid message");
-            println!("{:?}", message);
+            let string_message: String = message
+                .get_payload::<String>()
+                .expect("Failed to convert payload to String");
+
             cloned_channel_manager
                 .lock()
                 .await
                 .send_message(
                     message.get_channel_name().parse().expect("Invalid channel"),
-                    message.get_payload().unwrap(),
+                    &string_message,
                 )
                 .await;
         }
