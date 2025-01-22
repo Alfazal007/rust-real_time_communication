@@ -11,7 +11,7 @@ use tokio::sync::Mutex;
 
 pub struct AppState {
     pub api_secret: String,
-    pub channel_user_map: ChannelManager,
+    pub channel_user_map: Arc<Mutex<ChannelManager>>,
     pub redis_client: redis::Client,
     pub redis_pub_sub_handler_struct: Arc<Mutex<RedisPubSub>>,
 }
@@ -48,16 +48,28 @@ async fn main() {
             pubsub_sink,
         }));
 
+    let channel_manager = Arc::new(Mutex::new(ChannelManager::new()));
+    let cloned_channel_manager = channel_manager.clone();
     tokio::spawn(async move {
         loop {
-            let mut message = pubsub_stream.next().await;
+            let message = pubsub_stream.next().await.expect("Invalid message");
             println!("{:?}", message);
+            cloned_channel_manager
+                .lock()
+                .await
+                .send_message(
+                    message.get_channel_name().parse().expect("Invalid channel"),
+                    message.get_payload().unwrap(),
+                )
+                .await;
         }
     });
 
+    let shared_channel = channel_manager.clone();
+
     let app_state = Arc::new(AppState {
         api_secret,
-        channel_user_map: ChannelManager::new(),
+        channel_user_map: shared_channel,
         redis_client: redis_client.lock().await.clone(),
         redis_pub_sub_handler_struct: redis_subscription_struct,
     });
