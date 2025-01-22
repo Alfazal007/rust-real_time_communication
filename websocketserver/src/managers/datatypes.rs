@@ -6,9 +6,10 @@ use std::{
 use axum::extract::ws::{Message, Utf8Bytes, WebSocket};
 use futures_util::sink::SinkExt;
 use futures_util::stream::SplitSink;
-use tokio::sync::RwLock;
+use redis::aio::PubSub;
+use tokio::sync::{Mutex, RwLock};
 
-use super::{subscribe_connection, unsubscribe_connection::unsubscribe_from_redis};
+use super::{subscribe_connection::RedisPubSub, unsubscribe_connection::unsubscribe_from_redis};
 
 #[derive(Debug)]
 pub struct Connection {
@@ -56,7 +57,7 @@ impl ChannelManager {
         user_id: i32,
         channel_ids: Vec<i32>,
         websocket_sender: Arc<RwLock<SplitSink<WebSocket, Message>>>,
-        //        redis_pool: &Pool<Client>,
+        redis_subscription_struct: Arc<Mutex<RedisPubSub>>,
     ) {
         if !self.user_connected(user_id).await {
             let mut locked_channels = self.channels.write().await;
@@ -74,8 +75,16 @@ impl ChannelManager {
                     sender: websocket_sender,
                 },
             );
-
-            //             subscribe_connection::subscribe(channel_ids).await;
+            println!("Up top");
+            {
+                println!("hereerrr");
+                redis_subscription_struct
+                    .lock()
+                    .await
+                    .subscribe(channel_ids)
+                    .await;
+            }
+            println!("Down top");
         }
         self.print_room().await;
     }

@@ -1,21 +1,22 @@
 use std::collections::HashSet;
 
+use redis::aio::PubSubSink;
+
 pub struct RedisPubSub {
     pub subscribed_channels: HashSet<i32>,
+    pub pubsub_sink: PubSubSink,
 }
 
 impl RedisPubSub {
-    pub async fn subscribe(
-        &mut self,
-        pubsub: &mut redis::aio::PubSub,
-        channels_to_subscribe: Vec<i32>,
-    ) -> bool {
+    pub async fn subscribe(&mut self, channels_to_subscribe: Vec<i32>) -> bool {
         println!("need to subscribe");
         {
-            println!("2");
             for channel in channels_to_subscribe.iter() {
+                println!("Trying to subscribe to {:?}", channel);
                 if !self.subscribed_channels.contains(channel) {
-                    let subscription_res = pubsub.subscribe(channel).await;
+                    println!("In here 1");
+                    let subscription_res = self.pubsub_sink.subscribe(channel).await;
+                    println!("In here 2");
                     if subscription_res.is_err() {
                         println!("Issue subscribing to {:?}", channel);
                     } else {
@@ -24,7 +25,6 @@ impl RedisPubSub {
                     }
                 }
             }
-            println!("2");
         }
         true
     }

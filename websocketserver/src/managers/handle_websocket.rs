@@ -32,9 +32,10 @@ pub async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
 										axum::extract::ws::Message::Close(None)).await{};
 								break;
 								}
-
 								let channels = get_channels(user_id, &state.api_secret).await;
-								state.channel_user_map.add_user(user_id, channels.unwrap(), sender.clone()).await;
+								state
+									.channel_user_map.add_user(user_id, channels.unwrap(), sender.clone(), state.redis_pub_sub_handler_struct.clone())
+								.await;
 							},
 							crate::managers::message_type_check::IncomingMessageFromUser::LeaveMessage => {
 								state.channel_user_map.remove_user(&sender).await;
