@@ -61,6 +61,10 @@ async fn main() -> std::io::Result<()> {
                 "/",
                 web::get().to(routes::test::hello_response::hello_response),
             )
+            .route(
+                "/{dummy}",
+                web::get().to(routes::test::test_url_change::url_test_response),
+            )
             .service(
                 web::scope("/api/v1/user")
                     .route(

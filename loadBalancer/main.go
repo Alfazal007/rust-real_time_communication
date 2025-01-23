@@ -14,11 +14,12 @@ func main() {
 		log.Fatal("Issue starting the TCP connection")
 	}
 
-	var waitGroup sync.WaitGroup
-	waitGroup.Add(1)
+	var topWaitGroup sync.WaitGroup
 
+	topWaitGroup.Add(1)
 	go func() {
-		defer waitGroup.Done()
+		defer topWaitGroup.Done()
+		defer conn.Close()
 		for {
 			fmt.Printf("Awaiting a new connection with number\n")
 			client, err := conn.Accept()
@@ -28,6 +29,7 @@ func main() {
 				client.Close()
 				continue
 			}
+
 			server, err := net.Dial("tcp", "127.0.0.1:8000")
 			if err != nil {
 				// This connection failed try to serve someone else
@@ -36,26 +38,18 @@ func main() {
 				server.Close()
 				continue
 			}
-			var curWg sync.WaitGroup
-			curWg.Add(2)
+
 			go func() {
-				defer curWg.Done()
+				defer client.Close()
 				io.Copy(server, client)
 			}()
+
 			go func() {
-				defer curWg.Done()
+				defer server.Close()
 				io.Copy(client, server)
 			}()
-			curWg.Wait()
-			fmt.Println("Closing the server connection")
-			server.Close()
-			fmt.Println("Closing the client connection")
-			client.Close()
-
 		}
 	}()
 
-	waitGroup.Wait()
-	conn.Close()
-	fmt.Println("Done")
+	topWaitGroup.Wait()
 }
