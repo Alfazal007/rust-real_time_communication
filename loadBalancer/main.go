@@ -38,6 +38,8 @@ func main() {
 			}
 
 			server_to_connect := algorithms.Round_robin_impl(type_of_server)
+			fmt.Println(server_to_connect)
+
 			server, err := net.Dial("tcp", server_to_connect)
 			if err != nil {
 				fmt.Println("Issue connecting to the server")
