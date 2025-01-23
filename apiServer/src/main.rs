@@ -57,6 +57,10 @@ async fn main() -> std::io::Result<()> {
                 redis_pool: redis_pool.clone(),
                 api_secret: api_secret.clone(),
             }))
+            .route(
+                "/",
+                web::get().to(routes::test::hello_response::hello_response),
+            )
             .service(
                 web::scope("/api/v1/user")
                     .route(

@@ -2,8 +2,10 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"net"
+	"sync"
 )
 
 func main() {
@@ -12,19 +14,48 @@ func main() {
 		log.Fatal("Issue starting the TCP connection")
 	}
 
-	connNumber := 1
-	for {
-		fmt.Printf("Awaiting a new connection with number %v\n", connNumber)
-		client, err := conn.Accept()
-		if err != nil {
-			log.Fatal("Issue connecting to the server")
+	var waitGroup sync.WaitGroup
+	waitGroup.Add(1)
+
+	go func() {
+		defer waitGroup.Done()
+		for {
+			fmt.Printf("Awaiting a new connection with number\n")
+			client, err := conn.Accept()
+			if err != nil {
+				// This connection failed try to serve someone else
+				log.Fatal("Issue connecting to the server")
+				client.Close()
+				continue
+			}
+			server, err := net.Dial("tcp", "127.0.0.1:8000")
+			if err != nil {
+				// This connection failed try to serve someone else
+				log.Fatal("Issue connecting to the server")
+				client.Close()
+				server.Close()
+				continue
+			}
+			var curWg sync.WaitGroup
+			curWg.Add(2)
+			go func() {
+				defer curWg.Done()
+				io.Copy(server, client)
+			}()
+			go func() {
+				defer curWg.Done()
+				io.Copy(client, server)
+			}()
+			curWg.Wait()
+			fmt.Println("Closing the server connection")
+			server.Close()
+			fmt.Println("Closing the client connection")
+			client.Close()
+
 		}
-		var buf []byte
-		client.Read(buf)
-		fmt.Println("The data from client is ", string(buf))
-		_, err = client.Write([]byte("Hello client from server"))
-		fmt.Println(err)
-		client.Close()
-		connNumber += 1
-	}
+	}()
+
+	waitGroup.Wait()
+	conn.Close()
+	fmt.Println("Done")
 }
