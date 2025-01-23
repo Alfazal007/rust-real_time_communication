@@ -32,6 +32,7 @@ async fn main() {
     let redis_client = Arc::new(Mutex::new(
         redis::Client::open("redis://127.0.0.1/").expect("Failed to create Redis client"),
     ));
+    let port = env::var("PORT").expect("Issue finding the port");
 
     let redis_pubsub_connection = redis_client
         .lock()
@@ -81,7 +82,7 @@ async fn main() {
         .route("/ws", get(websocket_handler))
         .with_state(app_state);
 
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:8001")
+    let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{}", port))
         .await
         .unwrap();
 

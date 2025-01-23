@@ -27,6 +27,7 @@ async fn main() -> std::io::Result<()> {
     dotenvy::dotenv().expect("Issue fetching the env");
     env_logger::Builder::new().parse_filters("info").init();
 
+    let port = env::var("PORT").expect("Issue finding the port");
     let database_url = env::var("DATABASE_URL").expect("Issue finding the database url");
     let api_secret = env::var("API_SECRET").expect("Issue finding the api secret");
     let access_token_secret =
@@ -118,7 +119,7 @@ async fn main() -> std::io::Result<()> {
                 web::post().to(routes::channel::get_user_channels::current_user_for_socket),
             )
     })
-    .bind(("127.0.0.1", 8000))
+    .bind(("127.0.0.1", port.parse().expect("Invalid port")))
     .expect("Port is already taken")
     .run()
     .await
